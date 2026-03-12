@@ -1,0 +1,3 @@
+change-template: |
+  - $TITLE (#$NUMBER)
+    $BODY
