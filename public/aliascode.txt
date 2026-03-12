@@ -1,0 +1,11 @@
+git config --global alias.feature '!f() { 
+  git checkout master && \
+  git pull origin master && \
+  name=$(echo "$*" | tr " " "-") && \
+  git checkout -b feature/$name; 
+}; f'
+
+
+git feature JIRA-123 add-login-api
+
+feature/JIRA-123-add-login-api
