@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import TreeNode from "./TreeNode";
+import { v4 as uuidv4 } from "uuid";
 
-export type Person = {
+type Person = {
   id: string;
   name: string;
   image?: string;
-  spouse?: Person | null;
+  spouse?: Person;
   children: Person[];
 };
 
@@ -16,93 +17,101 @@ const FamilyTree: React.FC = () => {
     children: [],
   });
 
-  const addChild = (parentId: string) => {
-    setTree((prev) => {
-      const addRecursive = (node: Person): Person => {
-        if (node.id === parentId) {
+  // Helper to update node at any depth
+  const updateNode = (
+    node: Person,
+    id: string,
+    callback: (n: Person) => Person
+  ): Person => {
+    if (node.id === id) return callback(node);
+    const newChildren = node.children.map((c) => updateNode(c, id, callback));
+    const newSpouse = node.spouse
+      ? updateNode(node.spouse, id, callback)
+      : undefined;
+    return { ...node, children: newChildren, spouse: newSpouse };
+  };
+
+  const onImageDrop = (id: string, url: string, isSpouse?: boolean) => {
+    setTree((prev) =>
+      updateNode(prev, id, (n) => {
+        if (isSpouse)
           return {
-            ...node,
-            children: [
-              ...node.children,
-              { id: `${parentId}-${Date.now()}`, name: "Child", children: [] },
-            ],
+            ...n,
+            spouse: {
+              ...(n.spouse || { id: uuidv4(), name: "Spouse", children: [] }),
+              image: url,
+            },
           };
-        }
-        return {
-          ...node,
-          children: node.children.map(addRecursive),
-          spouse: node.spouse ? addRecursive(node.spouse) : node.spouse,
-        };
-      };
-      return addRecursive(prev);
-    });
+        return { ...n, image: url };
+      })
+    );
+  };
+
+  const addChild = (parentId: string) => {
+    setTree((prev) =>
+      updateNode(prev, parentId, (n) => ({
+        ...n,
+        children: [
+          ...n.children,
+          { id: uuidv4(), name: "Child", children: [] },
+        ],
+      }))
+    );
   };
 
   const addSpouse = (parentId: string) => {
-    setTree((prev) => {
-      const addRecursive = (node: Person): Person => {
-        if (node.id === parentId && !node.spouse) {
+    setTree((prev) =>
+      updateNode(prev, parentId, (n) => ({
+        ...n,
+        spouse: { id: uuidv4(), name: "Spouse", children: [] },
+      }))
+    );
+  };
+
+  const removeNode = (id: string, isSpouse?: boolean) => {
+    if (tree.id === id && !isSpouse) {
+      setTree({ id: "root", name: "You", children: [] });
+      return;
+    }
+
+    const removeFromNode = (node: Person): Person => {
+      let newChildren = node.children
+        .filter((c) => c.id !== id)
+        .map(removeFromNode);
+      let newSpouse = node.spouse;
+      if (node.spouse && node.spouse.id === id) newSpouse = undefined;
+      else if (node.spouse) newSpouse = removeFromNode(node.spouse);
+      return { ...node, children: newChildren, spouse: newSpouse };
+    };
+
+    setTree(removeFromNode(tree));
+  };
+
+  const updateName = (id: string, name: string, isSpouse?: boolean) => {
+    setTree((prev) =>
+      updateNode(prev, id, (n) => {
+        if (isSpouse)
           return {
-            ...node,
-            spouse: { id: `${parentId}-spouse`, name: "Spouse", children: [] },
+            ...n,
+            spouse: {
+              ...(n.spouse || { id: uuidv4(), name: "Spouse", children: [] }),
+              name,
+            },
           };
-        }
-        return {
-          ...node,
-          children: node.children.map(addRecursive),
-          spouse: node.spouse ? addRecursive(node.spouse) : node.spouse,
-        };
-      };
-      return addRecursive(prev);
-    });
-  };
-
-  const onImageDrop = (id: string, imageUrl: string, isSpouse = false) => {
-    const updateNode = (node: Person): Person => {
-      if (node.id === id) {
-        if (isSpouse && node.spouse) {
-          return { ...node, spouse: { ...node.spouse, image: imageUrl } };
-        }
-        return { ...node, image: imageUrl };
-      }
-      return {
-        ...node,
-        children: node.children.map(updateNode),
-        spouse: node.spouse ? updateNode(node.spouse) : node.spouse,
-      };
-    };
-    setTree((prev) => updateNode(prev));
-  };
-
-  const removeNode = (parentId: string, childId: string, isSpouse = false) => {
-    const removeRecursive = (node: Person) => {
-      if (node.id === parentId) {
-        if (isSpouse) {
-          node.spouse = null;
-        } else {
-          node.children = node.children.filter((c) => c.id !== childId);
-        }
-      } else {
-        node.children.forEach(removeRecursive);
-        if (node.spouse) removeRecursive(node.spouse);
-      }
-    };
-
-    setTree((prev) => {
-      const copy = { ...prev };
-      removeRecursive(copy);
-      return { ...copy };
-    });
+        return { ...n, name };
+      })
+    );
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+    <div style={{ width: "100%", overflowX: "auto" }}>
       <TreeNode
         node={tree}
         onImageDrop={onImageDrop}
         addChild={addChild}
         addSpouse={addSpouse}
         removeNode={removeNode}
+        updateName={updateName}
       />
     </div>
   );

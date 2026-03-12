@@ -1,12 +1,20 @@
 import React from "react";
-import type { Person } from "./FamilyTree";
+
+type Person = {
+  id: string;
+  name: string;
+  image?: string;
+  spouse?: Person;
+  children: Person[];
+};
 
 type TreeNodeProps = {
   node: Person;
   onImageDrop: (id: string, imageUrl: string, isSpouse?: boolean) => void;
   addChild: (parentId: string) => void;
   addSpouse: (parentId: string) => void;
-  removeNode: (parentId: string, childId: string, isSpouse?: boolean) => void;
+  removeNode: (id: string, isSpouse?: boolean) => void;
+  updateName: (id: string, name: string, isSpouse?: boolean) => void;
   level?: number;
 };
 
@@ -18,25 +26,138 @@ const TreeNode: React.FC<TreeNodeProps> = ({
   addChild,
   addSpouse,
   removeNode,
+  updateName,
   level = 0,
 }) => {
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, isSpouse = false) => {
+  const nodeSize = 90;
+  const gap = 10;
+  const minWidth = 200;
+  const padding = 10;
+  const bgColor = levelColors[level % levelColors.length];
+
+  const handleDrop = (
+    e: React.DragEvent<HTMLDivElement>,
+    personId: string,
+    isSpouse = false
+  ) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
       const url = URL.createObjectURL(file);
-      onImageDrop(node.id, url, isSpouse);
+      onImageDrop(personId, url, isSpouse);
     }
   };
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) =>
     e.preventDefault();
 
-  const bgColor = levelColors[level % levelColors.length];
-  const nodeSize = 90;
-  const gap = 10;
-  const minWidth = 200;
-  const padding = 10;
+  const renderNode = (person: Person, isSpouse = false) => (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        margin: 5,
+      }}
+    >
+      <div style={{ position: "relative", width: nodeSize, height: nodeSize }}>
+        {/* Node Circle */}
+        <div
+          onDrop={(e) => handleDrop(e, person.id, isSpouse)}
+          onDragOver={handleDragOver}
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "2px dashed #4a90e2",
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            background: "#fff",
+            color: "#888",
+            fontWeight: 500,
+            fontSize: "0.8rem",
+            textAlign: "center",
+            borderColor: isSpouse ? "#e94a4a" : "#4a90e2",
+          }}
+        >
+          {person.image ? (
+            <img
+              src={person.image}
+              alt={person.name}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+          ) : (
+            <div>{isSpouse ? "Drop Spouse" : "Drop You"}</div>
+          )}
+        </div>
+
+        {/* File input overlay */}
+        <input
+          type="file"
+          accept="image/*"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            opacity: 0,
+            cursor: "pointer",
+            zIndex: 2,
+          }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              const url = URL.createObjectURL(file);
+              onImageDrop(person.id, url, isSpouse); // <- use person.id
+            }
+            e.target.value = "";
+          }}
+        />
+
+        {/* Remove button */}
+        <button
+          onClick={() => removeNode(person.id, isSpouse)} // <- use person.id
+          style={{
+            position: "absolute",
+            top: -6,
+            right: -6,
+            zIndex: 3,
+            background: "#e94a4a",
+            color: "#fff",
+            border: "none",
+            borderRadius: "50%",
+            width: 20,
+            height: 20,
+            fontSize: 14,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 0,
+          }}
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Name input */}
+      <input
+        type="text"
+        value={person.name}
+        placeholder={isSpouse ? "Spouse Name" : "Name"}
+        onChange={(e) => updateName(person.id, e.target.value, isSpouse)} // <- use person.id
+        style={{
+          width: 80,
+          marginTop: 5,
+          textAlign: "center",
+          fontSize: "0.8rem",
+        }}
+      />
+    </div>
+  );
 
   return (
     <div style={{ margin: 10 }}>
@@ -53,159 +174,10 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           border: "1.5px solid #4a90e2",
           minWidth,
           flexWrap: "wrap",
-          position: "relative",
         }}
       >
-        {/* Main Person */}
-        <div
-          style={{
-            width: nodeSize,
-            height: nodeSize,
-            border: "2px dashed #4a90e2",
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            background: "#fff",
-            color: "#888",
-            fontWeight: 500,
-            fontSize: "0.8rem",
-            textAlign: "center",
-            position: "relative",
-          }}
-          onDrop={(e) => handleDrop(e)}
-          onDragOver={handleDragOver}
-        >
-          {node.image ? (
-            <img
-              src={node.image}
-              alt={node.name}
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          ) : (
-            <div>Drop You</div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            style={{
-              position: "absolute",
-              width: "100%",
-              height: "100%",
-              opacity: 0,
-              cursor: "pointer",
-              top: 0,
-              left: 0,
-              zIndex: 2,
-            }}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onImageDrop(node.id, URL.createObjectURL(file), false);
-            }}
-          />
-          {/* Remove button for self */}
-          {node.image && (
-            <button
-              onClick={() => onImageDrop(node.id, "", false)}
-              style={{
-                position: "absolute",
-                top: -6,
-                right: -6,
-                zIndex: 3,
-                background: "#e94a4a",
-                color: "#fff",
-                border: "none",
-                borderRadius: "50%",
-                width: 20,
-                height: 20,
-                fontSize: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0,
-              }}
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        {/* Spouse */}
-        {node.spouse && (
-          <div
-            style={{
-              width: nodeSize,
-              height: nodeSize,
-              border: "2px dashed #e94a4a",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-              background: "#fff",
-              color: "#888",
-              fontWeight: 500,
-              fontSize: "0.8rem",
-              textAlign: "center",
-              position: "relative",
-            }}
-            onDrop={(e) => handleDrop(e, true)}
-            onDragOver={handleDragOver}
-          >
-            {node.spouse.image ? (
-              <img
-                src={node.spouse.image}
-                alt={node.spouse.name}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              <div>Drop Spouse</div>
-            )}
-            <input
-              type="file"
-              accept="image/*"
-              style={{
-                position: "absolute",
-                width: "100%",
-                height: "100%",
-                opacity: 0,
-                cursor: "pointer",
-                top: 0,
-                left: 0,
-                zIndex: 2,
-              }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) onImageDrop(node.id, URL.createObjectURL(file), true);
-              }}
-            />
-            <button
-              onClick={() => removeNode(node.id, node.spouse!.id, true)}
-              style={{
-                position: "absolute",
-                top: -6,
-                right: -6,
-                zIndex: 3,
-                background: "#e94a4a",
-                color: "#fff",
-                border: "none",
-                borderRadius: "50%",
-                width: 20,
-                height: 20,
-                fontSize: 14,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 0,
-              }}
-            >
-              ×
-            </button>
-          </div>
-        )}
+        {renderNode(node, false)}
+        {node.spouse && renderNode(node.spouse, true)}
       </div>
 
       {/* Buttons */}
@@ -241,43 +213,16 @@ const TreeNode: React.FC<TreeNodeProps> = ({
           }}
         >
           {node.children.map((child) => (
-            <div
+            <TreeNode
               key={child.id}
-              style={{ flex: "0 0 auto", minWidth: 200, position: "relative" }}
-            >
-              <TreeNode
-                node={child}
-                onImageDrop={onImageDrop}
-                addChild={addChild}
-                addSpouse={addSpouse}
-                removeNode={removeNode}
-                level={level + 1}
-              />
-              {/* Remove child button */}
-              <button
-                onClick={() => removeNode(node.id, child.id)}
-                style={{
-                  position: "absolute",
-                  top: -10,
-                  right: -10,
-                  zIndex: 3,
-                  background: "#e94a4a",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "50%",
-                  width: 20,
-                  height: 20,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: 0,
-                }}
-              >
-                ×
-              </button>
-            </div>
+              node={child}
+              onImageDrop={onImageDrop}
+              addChild={addChild}
+              addSpouse={addSpouse}
+              removeNode={removeNode}
+              updateName={updateName}
+              level={level + 1}
+            />
           ))}
         </div>
       )}
